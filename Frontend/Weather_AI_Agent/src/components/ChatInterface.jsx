@@ -14,17 +14,30 @@ import VoiceRecorder from './VoiceRecorder';
 import { sendMessage } from '../services/api';
 import { convertSpeechToText, convertTextToSpeech } from '../services/voiceService';
 
+// Key for localStorage
+const STORAGE_KEY = 'weatherAiChatMessages';
+
 function ChatInterface() {
-    const [messages, setMessages] = useState([
-        {
-            id: 1,
-            text: "Hello! I'm your Weather AI Assistant. Ask me about the weather anywhere!",
-            sender: 'bot'
-        }
-    ]);
+    // Initialize messages from localStorage or use default welcome message
+    const [messages, setMessages] = useState(() => {
+        const savedMessages = localStorage.getItem(STORAGE_KEY);
+        return savedMessages ? JSON.parse(savedMessages) : [
+            {
+                id: 1,
+                text: "Hello! I'm your Weather AI Assistant. Ask me about the weather anywhere!",
+                sender: 'bot'
+            }
+        ];
+    });
+    
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef(null);
+
+    // Save messages to localStorage whenever they change
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    }, [messages]);
 
     // Auto-scroll to bottom when messages change
     useEffect(() => {
@@ -85,13 +98,44 @@ function ChatInterface() {
 
     const handleVoiceRecording = async (audioBlob) => {
         try {
+            // Add a temporary message to show we're processing
+            setMessages(prev => [
+                ...prev,
+                {
+                    id: Date.now(),
+                    text: "Processing your voice message...",
+                    sender: 'bot',
+                    isTemporary: true
+                }
+            ]);
+            
             const transcribedText = await convertSpeechToText(audioBlob);
-            if (transcribedText) {
-                setInput(transcribedText);
+            
+            // Remove the temporary message
+            setMessages(prev => prev.filter(msg => !msg.isTemporary));
+            
+            if (transcribedText && transcribedText.trim()) {
+                // Show what was transcribed
+                setMessages(prev => [
+                    ...prev,
+                    {
+                        id: Date.now(),
+                        text: transcribedText,
+                        sender: 'user',
+                    }
+                ]);
+                
+                // Process the transcribed text
                 await processMessage(transcribedText);
+            } else {
+                throw new Error('No text was transcribed');
             }
         } catch (error) {
             console.error('Error processing voice recording:', error);
+            
+            // Remove the temporary message if it exists
+            setMessages(prev => prev.filter(msg => !msg.isTemporary));
+            
             setMessages(prev => [
                 ...prev,
                 {
@@ -111,6 +155,18 @@ function ChatInterface() {
         }
     };
 
+    // Add a function to clear chat history
+    const clearChatHistory = () => {
+        localStorage.removeItem(STORAGE_KEY);
+        setMessages([
+            {
+                id: Date.now(),
+                text: "Hello! I'm your Weather AI Assistant. Ask me about the weather anywhere!",
+                sender: 'bot'
+            }
+        ]);
+    };
+
     return (
         <Paper
             elevation={3}
@@ -123,9 +179,26 @@ function ChatInterface() {
                 boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)'
             }}
         >
-            <Box sx={{ p: 2, borderBottom: '1px solid rgba(0, 0, 0, 0.1)' }}>
+            <Box sx={{ 
+                p: 2, 
+                borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+            }}>
                 <Typography variant="h6" sx={{ fontWeight: 500 }}>
                     Chat with Weather AI
+                </Typography>
+                <Typography 
+                    variant="caption" 
+                    sx={{ 
+                        color: 'text.secondary',
+                        cursor: 'pointer',
+                        '&:hover': { textDecoration: 'underline' }
+                    }}
+                    onClick={clearChatHistory}
+                >
+                    Clear Chat
                 </Typography>
             </Box>
 
