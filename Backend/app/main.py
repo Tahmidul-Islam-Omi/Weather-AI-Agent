@@ -30,3 +30,8 @@ async def root():
         "docs": "/docs",
         "version": settings.VERSION
     }
+    
+# Vercel-specific change - replace the if/else block with this:
+handler = app  # Vercel specifically looks for a 'handler' variable
+
+    
