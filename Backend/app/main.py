@@ -28,11 +28,10 @@ async def root():
         "docs": "/docs",
         "version": settings.VERSION
     }
-
-# Vercel compatibility (must be at the end)
-handler = app
-
+    
 # Local development (only runs when executed directly)
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host=settings.API_HOST, port=int(settings.API_PORT), reload=settings.DEBUG)
+    
+# uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload    
