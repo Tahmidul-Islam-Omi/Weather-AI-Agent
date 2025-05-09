@@ -3,26 +3,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints.weather import router as weather_router
 from app.core.config import settings
 
-# Create FastAPI app
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description=settings.PROJECT_DESCRIPTION,
     version=settings.VERSION
 )
 
-# Add CORS middleware
+# Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
+# Routes
 app.include_router(weather_router, prefix="/api/weather", tags=["Weather"])
 
-# Root endpoint
 @app.get("/")
 async def root():
     return {
@@ -30,8 +28,11 @@ async def root():
         "docs": "/docs",
         "version": settings.VERSION
     }
-    
-# Vercel-specific change - replace the if/else block with this:
-handler = app  # Vercel specifically looks for a 'handler' variable
 
-    
+# Vercel compatibility (must be at the end)
+handler = app
+
+# Local development (only runs when executed directly)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host=settings.API_HOST, port=int(settings.API_PORT), reload=settings.DEBUG)
