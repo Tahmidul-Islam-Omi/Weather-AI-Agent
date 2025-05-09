@@ -59,12 +59,9 @@ function VoiceRecorder({ onRecordingComplete, disabled }) {
                 
                 // Create audio blob from chunks
                 const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                
-                // For debugging - create and play the audio
+
                 const audioUrl = URL.createObjectURL(audioBlob);
-                // const audio = new Audio(audioUrl);
-                // Uncomment to test playback:
-                // audio.play();
+                
                 console.log('Recording created:', audioUrl);
                 
                 try {

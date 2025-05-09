@@ -11,7 +11,7 @@ export const convertSpeechToText = async (audioBlob) => {
         
         // Use the original blob format (webm) instead of trying to convert it
         formData.append('file', audioBlob, 'recording.webm');
-        formData.append('model_id', 'eleven_multilingual_v2');
+        formData.append('model_id', 'scribe_v1'); // Updated to a valid model ID
 
         console.log('Sending audio for transcription...');
 
@@ -56,7 +56,7 @@ export const convertSpeechToText = async (audioBlob) => {
                     const altFormData = new FormData();
                     const altBlob = new Blob([audioArrayBuffer], { type: 'audio/mp3' });
                     altFormData.append('file', altBlob, 'recording.mp3');
-                    altFormData.append('model_id', 'eleven_multilingual_v2');
+                    altFormData.append('model_id', 'scribe_v1'); // Updated here too
                     
                     const altResponse = await axios.post(
                         'https://api.elevenlabs.io/v1/speech-to-text',

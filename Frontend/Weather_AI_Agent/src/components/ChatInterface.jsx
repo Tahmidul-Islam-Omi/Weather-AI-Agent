@@ -111,7 +111,7 @@ function ChatInterface() {
             
             const transcribedText = await convertSpeechToText(audioBlob);
             
-            // Remove the temporary message
+            // Remove the temporary message (Processing your voice message...)
             setMessages(prev => prev.filter(msg => !msg.isTemporary));
             
             if (transcribedText && transcribedText.trim()) {
