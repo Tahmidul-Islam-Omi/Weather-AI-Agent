@@ -5,5 +5,5 @@ httpx==0.25.1
 pydantic==2.11.4
 langchain==0.3.25
 langchain-core==0.3.58
-google-generativeai==0.7.0
-langchain-google-genai==2.1.4
+google-generativeai
+langchain-google-genai
