@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8080/api/weather/query';
+const API_URL = 'https://weather-ai-agent-moxk.onrender.com/api/weather/query'; // Updated URL
 
 export const sendMessage = async (message) => {
     try {
