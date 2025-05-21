@@ -5,6 +5,9 @@ from app.services.weather_service import WeatherService
 import asyncio
 import json
 from datetime import datetime, timedelta
+from langchain.memory import ConversationBufferMemory # Add this import
+from langchain_core.messages import HumanMessage, AIMessage # Modified this import
+from app.db.supabase_client import supabase_db # Add this import
 
 class WeatherAIService:
     """Service for processing weather queries using LangChain and Gemini"""
@@ -28,6 +31,9 @@ class WeatherAIService:
             google_api_key=settings.GOOGLE_API_KEY,
             temperature=0.2
         )
+        # self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True) # Remove or comment out
+        self.db = supabase_db # Use the Supabase client instance
+        self.last_known_cities: List[str] = []
     
     async def _extract_query_details(self, query: str) -> Dict[str, Any]:
         """Extract detailed information from the weather query"""
@@ -46,7 +52,7 @@ class WeatherAIService:
         Response should be ONLY valid JSON.
         """
         
-        response = await self.llm.ainvoke(prompt)
+        response = await self.llm.ainvoke(prompt) # This line was previously commented out
         try:
             # Clean the response to ensure it's valid JSON
             content = response.content.strip()
@@ -85,9 +91,9 @@ class WeatherAIService:
         
         return weather_data
     
-    async def _generate_weather_explanation(self, query: str, query_details: Dict[str, Any], weather_data: Dict[str, Any]) -> str:
-        """Generate a natural language explanation of weather data"""
-        prompt = f"""
+    async def _generate_weather_explanation(self, query: str, query_details: Dict[str, Any], weather_data: Dict[str, Any], session_id: Optional[str] = None) -> str:
+        """Generate a natural language explanation of weather data, considering chat history from Supabase"""
+        prompt_text = f"""
         Generate a helpful explanation for the following weather query and data:
         
         Query: {query}
@@ -106,10 +112,24 @@ class WeatherAIService:
         Provide a concise, natural-sounding explanation focusing on exactly what was asked.
         """
         
-        response = await self.llm.ainvoke(prompt)
+        # Load chat history from Supabase
+        history_from_db = await self.db.get_chat_history(session_id=session_id, limit=5) # Get last 5 interactions
+        
+        chat_history_messages = []
+        for record in history_from_db:
+            chat_history_messages.append(HumanMessage(content=record["user_message"]))
+            chat_history_messages.append(AIMessage(content=record["ai_response"]))
+            
+        # Create the current prompt message
+        current_prompt_message = HumanMessage(content=prompt_text)
+        
+        # Combine history with the current prompt
+        llm_input_messages = chat_history_messages + [current_prompt_message]
+        
+        response = await self.llm.ainvoke(llm_input_messages)
         return response.content.strip()
     
-    async def process_query(self, query: str) -> Dict[str, Any]:
+    async def process_query(self, query: str, session_id: Optional[str] = None) -> Dict[str, Any]: # Add session_id
         """Process a user's weather query"""
         try:
             if not query or query.strip() == "":
@@ -123,20 +143,42 @@ class WeatherAIService:
             # Extract detailed query information
             query_details = await self._extract_query_details(query)
             
-            # Handle queries with no city specified
-            if not query_details["cities"]:
-                return {
+            # If current query doesn't specify cities, try to use last known cities
+            # This logic might need refinement with persistent chat history.
+            # For now, we keep it, but session_id based context might be more robust.
+            if not query_details.get("cities") and self.last_known_cities:
+                query_details["cities"] = self.last_known_cities
+            elif query_details.get("cities"):
+                self.last_known_cities = query_details["cities"]
+            
+            if not query_details.get("cities"):
+                # Try to infer city from chat history if not in current query or memory
+                history = await self.db.get_chat_history(session_id=session_id, limit=1)
+                if history:
+                    # A simple heuristic: check the last user message for city names
+                    # This could be improved with more sophisticated context extraction
+                    last_user_message = history[0]["user_message"]
+                    # Re-run extraction on last message if it might contain a city
+                    # For simplicity, we'll just note this as an area for improvement.
+                    # For now, if no city, we ask.
+                    pass # Placeholder for more advanced city inference from history
+
+            if not query_details.get("cities"):
+                 return {
                     "query": query,
-                    "processed_query": "No city specified in query",
+                    "processed_query": "No city specified in query or recent context.",
                     "weather_data": {},
-                    "ai_explanation": "I couldn't determine which city you're asking about. Please specify a city name in your query."
+                    "ai_explanation": "I couldn't determine which city you're asking about. Please specify a city name in your query or ensure it was mentioned recently."
                 }
             
             # Get weather data based on query details
             weather_data = await self._get_weather_data(query_details)
             
-            # Generate explanation
-            explanation = await self._generate_weather_explanation(query, query_details, weather_data)
+            # Generate explanation, passing session_id
+            explanation = await self._generate_weather_explanation(query, query_details, weather_data, session_id)
+            
+            # Save the current interaction to Supabase
+            await self.db.save_chat_message(session_id=session_id, user_message=query, ai_response=explanation)
             
             # Return structured response
             return {

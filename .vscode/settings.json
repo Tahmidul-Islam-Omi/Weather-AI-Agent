@@ -1,5 +1,6 @@
 {
   "cSpell.words": [
+    "asyncpg",
     "dotenv",
     "ELEVENLABS",
     "EXAVIT",
@@ -15,6 +16,7 @@
     "pytest",
     "Rpqbh",
     "sdist",
+    "supabase",
     "uvicorn",
     "venv",
     "Vercel",

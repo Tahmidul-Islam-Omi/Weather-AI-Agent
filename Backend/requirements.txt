@@ -7,3 +7,4 @@ langchain==0.3.25
 langchain-core==0.3.58
 google-generativeai
 langchain-google-genai
+asyncpg

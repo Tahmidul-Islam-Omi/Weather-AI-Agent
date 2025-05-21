@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints.weather import router as weather_router
 from app.core.config import settings
+from app.db.supabase_client import SupabaseDB # Import the class itself
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -21,6 +22,16 @@ app.add_middleware(
 # Routes
 app.include_router(weather_router, prefix="/api/weather", tags=["Weather"])
 
+@app.on_event("startup")
+async def startup_event():
+    print("Application startup: Initializing database pool...")
+    await SupabaseDB.init_db_pool() # This line calls the initialization
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    print("Application shutdown: Closing database pool...")
+    await SupabaseDB.close_db_pool()
+
 @app.get("/")
 async def root():
     return {
@@ -34,4 +45,4 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host=settings.API_HOST, port=int(settings.API_PORT), reload=settings.DEBUG)
     
-# uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload    
+# uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload

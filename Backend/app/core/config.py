@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from typing import Optional # This import is present
 
 # Load environment variables from .env file
 load_dotenv()
@@ -15,6 +16,9 @@ class Settings:
     
     # OpenWeatherMap API Base URL
     OPENWEATHERMAP_BASE_URL: str = "https://api.openweathermap.org/data/2.5"
+    
+    # Supabase Credentials
+    DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL") # This will be used
     
     # Project metadata
     PROJECT_NAME: str = "Weather AI Agent"
