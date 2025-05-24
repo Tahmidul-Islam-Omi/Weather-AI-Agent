@@ -40,50 +40,29 @@ class WeatherAIService:
         self.last_known_cities: List[str] = []
         logger.info("WeatherAIService initialized.")
     
-    async def _extract_query_details(self, query: str, previous_history: List[Dict[str, Any]] = None) -> Dict[str, Any]:
-        logger.debug(f"Extracting query details for: {query}")
-        
-        prompt = llm_prompts.EXTRACT_QUERY_DETAILS_PROMPT_TEMPLATE.format(
-            query=query,
-            query_types_list=list(self.QUERY_TYPES.keys())
-        )
-        
+    async def _check_weather_related(self, query: str) -> bool:
+        """
+        Checks if the query is weather-related using the safeguard prompt.
+        Returns True if weather-related, False otherwise.
+        """
+        logger.debug(f"Checking if query is weather-related: {query}")
+        prompt = llm_prompts.WEATHER_QUERY_SAFEGUARD_PROMPT_TEMPLATE.format(query=query)
         response = await self.llm.ainvoke(prompt)
-        try:
-            # Clean the response to ensure it's valid JSON
-            content = response.content.strip()
-            if content.startswith("```json"):
-                content = content[7:-3]
-            elif content.startswith("```") and content.endswith("```"):
-                content = content[3:-3]
-            
-            extracted_details = json.loads(content)
-            logger.debug(f"Extracted details: {extracted_details}")
-            
-            # If we detect it's a follow-up query with time references but no city
-            if extracted_details.get("is_follow_up", False) and not extracted_details.get("cities"):
-                # Set specific time-related flags for the weather service to use
-                if "tomorrow" in query.lower():
-                    extracted_details["time_context"] = "future"
-                    extracted_details["specific_time"] = "tomorrow"
-                elif "week" in query.lower():
-                    extracted_details["time_context"] = "future"
-                    extracted_details["specific_time"] = "week"
-                elif "month" in query.lower():
-                    extracted_details["time_context"] = "future"
-                    extracted_details["specific_time"] = "month"
-                    
-            return extracted_details
-        except json.JSONDecodeError as e:
-            logger.error(f"JSONDecodeError in _extract_query_details: {e}. Content was: {response.content}")
-            return {
-                "cities": [],
-                "query_types": ["current"],
-                "time_context": "current",
-                "specific_conditions": [],
-                "comparison_type": None,
-                "is_follow_up": "tomorrow" in query.lower() or "next" in query.lower() or "and" in query.lower()
-            }
+        result = response.content.strip()
+        logger.debug(f"Weather check response: {result}")
+        return "WEATHER_RELATED" in result
+    
+    def _build_non_weather_response(self, query: str) -> Dict[str, Any]:
+        """Constructs the response when the query is not weather-related."""
+        logger.warning(f"Non-weather query received: {query}")
+        return {
+            "query": query,
+            "processed_query": "Non-weather query received.",
+            "weather_data": {},
+            "ai_explanation": "I'm a weather-focused assistant and can only help with weather-related questions. Please ask me about current weather, forecasts, or any other weather-related topics!"
+        }
+    
+    # Removed _extract_query_details method
     
     def _handle_empty_query(self, query: str) -> Optional[Dict[str, Any]]:
         # MODIFIED: Use helper function
@@ -120,14 +99,37 @@ class WeatherAIService:
         logger.info(f"Processing query: '{query}' for session_id: '{session_id}'")
         try:
             empty_query_response = self._handle_empty_query(query)
+            
             if empty_query_response:
                 return empty_query_response
-            query_details = await self._extract_query_details(query)
+            
+            # Check if query is weather-related
+            is_weather_related = await self._check_weather_related(query)
+            if not is_weather_related:
+                # If query is not weather-related, don't bother with city validation
+                # or other weather-specific processing
+                non_weather_response = self._build_non_weather_response(query)
+                # Still save the interaction in chat history
+                await self.db.save_chat_message(session_id=session_id, user_message=query, ai_response=non_weather_response["ai_explanation"])
+                return non_weather_response
+            
+            # MODIFIED: Call the helper function directly
+            query_details = await query_helper.extract_query_details_from_llm(
+                llm=self.llm,
+                query=query,
+                query_types_list=list(self.QUERY_TYPES.keys()),
+                logger=logger
+            )
+            
             logger.info(f"Initial query_details: {query_details}")
+            
             await self._infer_city_from_history_if_needed(query_details, query, session_id)
             city_present, self.last_known_cities = query_helper.manage_city_context(query_details, self.last_known_cities, logger)
             if not city_present:
-                return self._build_no_city_response(query)
+                no_city_response = self._build_no_city_response(query)
+                await self.db.save_chat_message(session_id=session_id, user_message=query, ai_response=no_city_response["ai_explanation"])
+                return no_city_response
+            
             weather_data = await query_helper.get_weather_data(self.weather_service, query_details, logger)
             explanation = await query_helper.generate_weather_explanation(self.llm, self.db, llm_prompts, query, query_details, weather_data, session_id, logger)
             logger.debug(f"Attempting to save to DB: session_id='{session_id}', user_message='{query}'")

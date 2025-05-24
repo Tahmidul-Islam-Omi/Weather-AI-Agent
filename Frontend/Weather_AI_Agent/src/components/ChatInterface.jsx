@@ -1,18 +1,18 @@
-import { useState, useRef, useEffect } from 'react';
+import SendIcon from '@mui/icons-material/Send';
 import {
     Box,
+    CircularProgress,
+    Divider,
+    IconButton,
     Paper,
     TextField,
-    IconButton,
-    Typography,
-    CircularProgress,
-    Divider
+    Typography
 } from '@mui/material';
-import SendIcon from '@mui/icons-material/Send';
+import { useEffect, useRef, useState } from 'react';
+import { sendMessage, clearChatHistory as clearChatHistoryAPI } from '../services/api';
+import { convertSpeechToText, convertTextToSpeech } from '../services/voiceService';
 import MessageList from './MessageList';
 import VoiceRecorder from './VoiceRecorder';
-import { sendMessage } from '../services/api';
-import { convertSpeechToText, convertTextToSpeech } from '../services/voiceService';
 
 // Key for localStorage
 const STORAGE_KEY = 'weatherAiChatMessages';
@@ -63,6 +63,7 @@ function ChatInterface() {
                 audioUrl = await convertTextToSpeech(response.ai_explanation);
             } catch (voiceError) {
                 console.error('Error generating voice response:', voiceError);
+                // Don't show an error to the user, just continue without audio
             }
 
             // Add bot response to chat
@@ -109,7 +110,29 @@ function ChatInterface() {
                 }
             ]);
             
-            const transcribedText = await convertSpeechToText(audioBlob);
+            let transcribedText;
+            try {
+                transcribedText = await convertSpeechToText(audioBlob);
+            } catch (voiceError) {
+                console.error('Error transcribing voice:', voiceError);
+                // Remove the temporary message
+                setMessages(prev => prev.filter(msg => !msg.isTemporary));
+                
+                // Add an appropriate error message
+                setMessages(prev => [
+                    ...prev,
+                    {
+                        id: Date.now() + 1,
+                        text: voiceError.message === "ElevenLabs API key not configured" || 
+                              voiceError.message === "ElevenLabs API authentication failed. Please check your API key."
+                            ? "Voice recognition is currently unavailable. Please type your question instead."
+                            : "Sorry, I couldn't understand your voice message. Please try again or type your question.",
+                        sender: 'bot',
+                        error: true
+                    }
+                ]);
+                return;
+            }
             
             // Remove the temporary message (Processing your voice message...)
             setMessages(prev => prev.filter(msg => !msg.isTemporary));
@@ -156,15 +179,35 @@ function ChatInterface() {
     };
 
     // Add a function to clear chat history
-    const clearChatHistory = () => {
-        localStorage.removeItem(STORAGE_KEY);
-        setMessages([
-            {
-                id: Date.now(),
-                text: "Hello! I'm your Weather AI Assistant. Ask me about the weather anywhere!",
-                sender: 'bot'
-            }
-        ]);
+    // Update the clearChatHistory function
+    const clearChatHistory = async () => {
+        try {
+            // Clear from database
+            await clearChatHistoryAPI();
+            
+            // Clear from localStorage
+            localStorage.removeItem(STORAGE_KEY);
+            
+            // Reset messages to welcome message
+            setMessages([
+                {
+                    id: Date.now(),
+                    text: "Hello! I'm your Weather AI Assistant. Ask me about the weather anywhere!",
+                    sender: 'bot'
+                }
+            ]);
+        } catch (error) {
+            console.error('Error clearing chat history:', error);
+            // Still clear local storage even if API call fails
+            localStorage.removeItem(STORAGE_KEY);
+            setMessages([
+                {
+                    id: Date.now(),
+                    text: "Hello! I'm your Weather AI Assistant. Ask me about the weather anywhere!",
+                    sender: 'bot'
+                }
+            ]);
+        }
     };
 
     return (

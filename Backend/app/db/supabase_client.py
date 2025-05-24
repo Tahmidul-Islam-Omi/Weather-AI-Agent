@@ -76,8 +76,6 @@ class SupabaseDB:
         try:
             async with self.__class__._pool.acquire() as conn:
                 if session_id:
-                    # Ensure table and column names match your schema.
-                    # Original code reversed results after fetching DESC. Fetching ASC is simpler.
                     sql_query = """
                         SELECT * FROM chat_history
                         WHERE session_id = $1
@@ -93,16 +91,32 @@ class SupabaseDB:
                     """
                     records = await conn.fetch(sql_query, limit)
             
-            # Convert asyncpg.Record objects to dicts to match previous return type
             return [dict(record) for record in records]
         except Exception as e:
             print(f"Error getting chat history from database: {e}")
             return []
 
-# Global instance (or use dependency injection in FastAPI)
-supabase_db = SupabaseDB() # This instance will use the class-level pool
+    async def clear_chat_history(self, session_id: str) -> bool:
+        """Clear all chat history for a specific session"""
+        if self.__class__._pool is None:
+            print("Error: Database pool not initialized. Cannot clear chat history.")
+            raise RuntimeError("Database pool not initialized. Call SupabaseDB.init_db_pool() at application startup.")
+
+        query = """
+            DELETE FROM chat_history 
+            WHERE session_id = $1;
+        """
+        try:
+            async with self.__class__._pool.acquire() as conn:
+                result = await conn.execute(query, session_id)
+                print(f"Successfully cleared chat history for session {session_id}. Rows affected: {result}")
+                return True
+        except Exception as e:
+            print(f"Error clearing chat history for session {session_id}: {e}")
+            return False
+
+# Global instance
+supabase_db = SupabaseDB()
 
 async def get_supabase_db():
-    # This dependency injector remains the same.
-    # It returns the global instance, which relies on the initialized class pool.
     return supabase_db

@@ -73,7 +73,7 @@ async def infer_city_from_history(
     Returns the inferred city name or None.
     """
     logger.debug("Attempting to infer city from history.")
-    history = await db.get_chat_history(session_id=session_id, limit=3)
+    history = await db.get_chat_history(session_id=session_id, limit=5)
     
     if history:
         history_context_for_city_extraction_str = "Consider the following recent conversation:\n"
@@ -106,7 +106,7 @@ async def infer_city_from_history(
     return None
 
 async def get_weather_data(weather_service, query_details, logger=None):
-    """Fetch appropriate weather data based on query details (moved from ai_service)."""
+    """Fetch appropriate weather data based on query details """
     weather_data = {}
     for city in query_details["cities"]:
         city_data = {}

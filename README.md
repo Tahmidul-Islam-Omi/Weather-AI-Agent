@@ -26,14 +26,23 @@ The API will be available at http://localhost:8000 , and the API documentation a
 Frontend Setup
 1. Navigate to the frontend directory.
 ```bash
-cd "d:\ProjectFolder\Weather AI Agent\Frontend"
+cd "d:\ProjectFolder\Weather AI Agent\Frontend\Weather_AI_Agent"
 ```
 2. Install the required packages.
 ```bash
 npm install
 ```
-3. Create a .env file with your ElevenLabs API key:
+3. Create a .env file in the Weather_AI_Agent directory with your ElevenLabs API key:
+```
 VITE_ELEVENLABS_API_KEY=your_elevenlabs_api_key
+```
+
+Note about ElevenLabs API:
+- The app uses ElevenLabs for text-to-speech and speech-to-text functionality
+- You need to sign up at https://elevenlabs.io/ to get an API key
+- Free tier has limited usage, so you may need to upgrade for extended use
+- If you encounter a 401 error, your API key may be expired or invalid
+- Without a valid API key, voice features will be disabled but text chat will work normally
 
 4. Start the frontend server.
 ```bash

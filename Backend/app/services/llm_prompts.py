@@ -20,6 +20,30 @@ Provide a JSON response with the following fields:
 Response should be ONLY valid JSON.
 """
 
+WEATHER_QUERY_SAFEGUARD_PROMPT_TEMPLATE = """
+You are a weather-focused AI assistant. Your primary function is to provide weather-related information and assistance.
+
+Analyze the following user query: "{query}"
+
+Determine if this query is weather-related. Weather-related queries include:
+- Current weather conditions
+- Weather forecasts
+- Historical weather data
+- Weather comparisons between locations or times
+- Weather-related planning questions
+- Climate information
+- Weather alerts and warnings
+- Seasonal weather patterns
+- Weather-related travel advice
+
+If the query is NOT weather-related, respond with exactly:
+"I'm a weather-focused assistant and can only help with weather-related questions. Please ask me about current weather, forecasts, or any other weather-related topics!"
+
+If the query IS weather-related, respond with: "WEATHER_RELATED"
+
+Response:
+"""
+
 GENERATE_WEATHER_EXPLANATION_PROMPT_TEMPLATE = """
 Generate a helpful explanation for the following weather query and data:
 
